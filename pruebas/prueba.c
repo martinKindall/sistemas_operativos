@@ -9,9 +9,9 @@ int nMain()
 	nTask tareas[3];
 	int i;
 	for (i = 0; i < 3; ++i)
-	tareas[i] = nEmitTask(escritor, i, i * 200);
+		tareas[i] = nEmitTask(escritor, i, i * 200);
 	for (i = 0; i < 3; ++i)
-	nWaitTask(tareas[i]);
+		nWaitTask(tareas[i]);
 	nPrintf("Fin ejemplo\n");
 }
 
