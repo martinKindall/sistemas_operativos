@@ -107,8 +107,7 @@ void logicaTransbordo(int v, int* disponiblesEstaOrilla, int* disponiblesOrillaO
 				vehicAlla->listo = TRUE;
 			}
 
-			nNotifyAll(mon);
-			nWait(mon);
+			continue;
 		}
 		else{
 			nWait(mon);
