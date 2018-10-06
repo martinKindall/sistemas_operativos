@@ -7,9 +7,12 @@
 typedef struct{
 	int v;
 	int listo;
+	int enViaje;
 } Vehiculo;
 
 nMonitor mon;
+
+int esperando;
 
 int transbordadores;
 int *disponiblesPargua, *disponiblesChacao;
@@ -33,6 +36,8 @@ void inicializar(int p){
 
 	esperandoPargua = MakeFifoQueue();
 	esperandoChacao = MakeFifoQueue();
+
+	esperando = 0;
 }
 
 
@@ -61,36 +66,38 @@ void logicaTransbordo(int v, int* disponiblesEstaOrilla, int* disponiblesOrillaO
 	Vehiculo vehiculo;
 	vehiculo.v = v;
 	vehiculo.listo = FALSE;
+	vehiculo.enViaje = FALSE;
 
 	nEnter(mon);
 	PutObj(esperandoAca, &vehiculo);
-
-	int cambios = FALSE;
 
 	while(!vehiculo.listo)
 	{
 		int dispAca = getDisponible(disponiblesEstaOrilla);
 		int dispAlla = getDisponible(disponiblesOrillaOpuesta);
 
-		nPrintf("paso1 p: %d, pp: %d, v: %d, estado: %d\n", dispAca, dispAlla, v, vehiculo.listo);
+		// nPrintf("paso1 p: %d, pp: %d, v: %d, estado: %d\n", dispAca, dispAlla, v, vehiculo.listo);
 		if (dispAca > -1)
 		{
 			setDisponible(disponiblesEstaOrilla, dispAca, FALSE);
 			
-			// if (EmptyFifoQueue(esperandoAca)){
-			// 	// nPrintf("paso2 p: %d, pp: %d, v: %d, estado: %d\n", dispAca, dispAlla, v, vehiculo.listo);
-			// }
-
 			Vehiculo* vehicAca= GetObj(esperandoAca);
-			// nPrintf("paso2 p: %d, pp: %d, v: %d, estado: %d, sacado: %d\n", dispAca, dispAlla, v, vehiculo.listo, vehicAca->v);
 
 			if (vehicAca == NULL){
-				vehicAca = &vehiculo;
+				// nPrintf("paso22 p: %d, pp: %d, v: %d, estado: %d\n", dispAca, dispAlla, v, vehiculo.listo);
+			}else{
+				vehicAca->enViaje = TRUE;
+				// nPrintf("paso2 p: %d, pp: %d, v: %d, estado: %d, sacado: %d\n", dispAca, dispAlla, v, vehiculo.listo, vehicAca->v);
 			}
 
-			if (cambios){
-				cambios = FALSE;
-				nNotifyAll(mon);
+			if (vehicAca == NULL){
+				if (!vehiculo.enViaje){
+					vehicAca = &vehiculo;
+				}
+				else{
+					setDisponible(disponiblesEstaOrilla, dispAca, TRUE);
+					break;
+				}
 			}
 
 			nExit(mon);
@@ -99,28 +106,30 @@ void logicaTransbordo(int v, int* disponiblesEstaOrilla, int* disponiblesOrillaO
 			setDisponible(disponiblesOrillaOpuesta, dispAca, TRUE);
 			vehicAca->listo = TRUE;
 
-			nPrintf("paso3 p: %d, v: %d, sacado: %d, estado: %d\n", dispAca, v, vehicAca->v, vehiculo.listo);
+
+			// nPrintf("paso3 p: %d, v: %d, sacado: %d, estado: %d\n", dispAca, v, vehicAca->v, vehiculo.listo);
 			if (vehiculo.listo)
 			{
 				nNotifyAll(mon);
 				nExit(mon);
 				return;
 			}
-			cambios = TRUE;
+
+			if (esperando > 0){
+				nNotifyAll(mon);
+				// nPrintf("!!!!!!222222esperado: %d\n", esperando);
+			}
 		}
 		else if (dispAlla > -1){
 			setDisponible(disponiblesOrillaOpuesta, dispAlla, FALSE);
 			Vehiculo* vehicAlla= GetObj(esperandoAlla);
 
-			if (cambios){
-				nNotifyAll(mon);
-			}
-
 			if (vehicAlla != NULL){
-				nPrintf("paso5 p: %d, pp: %d, v: %d, estado: %d, sacado: %d\n", dispAca, dispAlla, v, vehiculo.listo, vehicAlla->v);
+				vehicAlla->enViaje = TRUE;
+				// nPrintf("paso5 p: %d, pp: %d, v: %d, estado: %d, sacado: %d\n", dispAca, dispAlla, v, vehiculo.listo, vehicAlla->v);
 			}
 
-			nPrintf("paso5 p: %d, pp: %d, v: %d, estado: %d\n", dispAca, dispAlla, v, vehiculo.listo);
+			// nPrintf("paso5 p: %d, pp: %d, v: %d, estado: %d\n", dispAca, dispAlla, v, vehiculo.listo);
 			nExit(mon);
 			if (vehicAlla == NULL){
 				haciaAca(dispAlla, -1);
@@ -129,7 +138,7 @@ void logicaTransbordo(int v, int* disponiblesEstaOrilla, int* disponiblesOrillaO
 				haciaAca(dispAlla, vehicAlla->v);
 			}
 			nEnter(mon);
-			nPrintf("paso4 p: %d, pp: %d, v: %d, estado: %d\n", dispAca, dispAlla, v, vehiculo.listo);
+			// nPrintf("paso4 p: %d, pp: %d, v: %d, estado: %d\n", dispAca, dispAlla, v, vehiculo.listo);
 
 			setDisponible(disponiblesEstaOrilla, dispAlla, TRUE);
 			if (vehicAlla != NULL){
@@ -137,21 +146,31 @@ void logicaTransbordo(int v, int* disponiblesEstaOrilla, int* disponiblesOrillaO
 				// nPrintf("paso4 p: %d, pp: %d, v: %d, estado: %d, sacado: %d\n", dispAca, dispAlla, v, vehiculo.listo, vehicAlla->v);
 			}
 			// nPrintf("paso2 p: %d, v: %d\n", dispAlla, v);
-			cambios = TRUE;
+			if (esperando > 0){
+				nNotifyAll(mon);
+				// nPrintf("!!!!!!esperado: %d\n", esperando);
+			}
 		}
 		else{
-			if (cambios){
-				cambios = FALSE;
-				nNotifyAll(mon);
-			}
-
+			esperando++;
+			// nPrintf("cayo aca2\n");
 			nWait(mon);
+			esperando--;
+			// nPrintf("cayo aca3\n");
 		}
 	}
-	if (cambios){
-		nPrintf("cayo aca");
+
+	while(!vehiculo.listo){
+		esperando++;
+		nWait(mon);
+		esperando--;
 	}
-	nNotifyAll(mon);
+
+	// nPrintf("esperado: %d\n", esperando);
+	if (esperando > 0){
+		// nPrintf("cayo aca\n");
+		nNotifyAll(mon);
+	}
 	nExit(mon);
 	return;
 }
