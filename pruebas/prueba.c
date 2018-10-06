@@ -4,7 +4,7 @@
 int escritor(int num, int espera);
 
 
-int nMain()
+int nMain(int argc, char **argv)
 {
 	nTask tareas[3];
 	int i;
