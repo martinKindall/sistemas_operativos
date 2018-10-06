@@ -1,4 +1,5 @@
 #include <nSystem.h>
+#include "fifoqueues.h"
 #include <stdio.h>
 #include "transbordo.h"
 
@@ -8,15 +9,18 @@ typedef struct{
 	int listo;
 } Vehiculo;
 
+nMonitor ctrl;
 
 int transbordadores;
 int *disponiblesPargua, *disponiblesChacao;
 
-FifoQueue* esperandoPargua;
-FifoQueue* esperandoChacao;
+FifoQueue esperandoPargua;
+FifoQueue esperandoChacao;
 
 
 void inicializar(int p){
+
+	ctrl= nMakeMonitor();
 
 	transbordadores = p;
 	disponiblesPargua = nMalloc(sizeof(int)*p);
@@ -46,152 +50,94 @@ int getDisponible(int* disponibles)
 	return disp;
 }
 
+
 void setDisponible(int* disponibles, int idx, int val)
 {
 	disponibles[idx] = val;
 }
 
 
-void transbordoAChacao(int v){
+void logicaTransbordo(int v, int* disponiblesEstaOrilla, int* disponiblesOrillaOpuesta, FifoQueue esperandoAca, FifoQueue esperandoAlla, void (*haciaAlla)(int p1, int v1), void (*haciaAca)(int p2, int v2)){
 	Vehiculo vehiculo;
 	vehiculo.v = v;
 	vehiculo.listo = FALSE;
 
-	nEnter(m);
-	PutObj(esperandoPargua, *vehiculo);
+	nEnter(ctrl);
+	PutObj(esperandoAca, &vehiculo);
 
-	while(!vehiculo->listo)
+	while(!vehiculo.listo)
 	{
-		int dispPargua = getDisponible(disponiblesPargua);
-		int dispChacao = getDisponible(disponiblesChacao);
+		int dispAca = getDisponible(disponiblesEstaOrilla);
+		int dispAlla = getDisponible(disponiblesOrillaOpuesta);
 
-		if (dispPargua > -1)
+		if (dispAca > -1)
 		{
-			setDisponible(disponiblesPargua, dispPargua, FALSE);
-			Vehiculo* vehicPargua= GetObj(esperandoPargua);
-			nExit(m);
-			haciaChacao(dispPargua, vehicPargua->v);
-			nEnter(m);
-			setDisponible(disponiblesChacao, dispPargua, TRUE);
-			vehicPargua->listo = TRUE;
-			nNotifyAll(m);
+			setDisponible(disponiblesEstaOrilla, dispAca, FALSE);
+			Vehiculo* vehicAca= GetObj(esperandoAca);
+			nExit(ctrl);
+			haciaAlla(dispAca, vehicAca->v);
+			nEnter(ctrl);
+			setDisponible(disponiblesOrillaOpuesta, dispAca, TRUE);
+			vehicAca->listo = TRUE;
+			nNotifyAll(ctrl);
 
-			if (vehicPargua->v == v)
+			if (vehicAca->v == v)
 			{
-				nExit(m);
-				return v;
+				nExit(ctrl);
+				return;
 			}
 
-			nWait(m);
+			nWait(ctrl);
 		}
-		else if (dispChacao > -1){
-			setDisponible(disponiblesChacao, dispChacao, FALSE);
-			Vehiculo* vehicChacao= GetObj(esperandoChacao);
-			nExit(m);
+		else if (dispAlla > -1){
+			setDisponible(disponiblesOrillaOpuesta, dispAlla, FALSE);
+			Vehiculo* vehicAlla= GetObj(esperandoAlla);
+			nExit(ctrl);
 
-			if (vehicChacao == NULL){
-				haciaPargua(dispChacao, -1);
+			if (vehicAlla == NULL){
+				haciaAca(dispAlla, -1);
 			}
 			else{
-				haciaPargua(dispChacao, vehicChacao->v);
+				haciaAca(dispAlla, vehicAlla->v);
 			}
-			nEnter(m);
-			setDisponible(disponiblesPargua, dispChacao, TRUE);
+			nEnter(ctrl);
+			setDisponible(disponiblesEstaOrilla, dispAlla, TRUE);
 
-			if (vehicChacao != NULL){
-				vehicChacao->listo = TRUE;
+			if (vehicAlla != NULL){
+				vehicAlla->listo = TRUE;
 			}
 
-			nNotifyAll(m);
-			nWait(m);
+			nNotifyAll(ctrl);
+			nWait(ctrl);
 		}
 		else{
-			nWait(m);
+			nWait(ctrl);
 		}
 	}
 
-	nExit(m);
-	return v;
+	nExit(ctrl);
+	return;
+}
+
+void transbordoAChacao(int v){
+	logicaTransbordo(v, disponiblesPargua, disponiblesChacao, esperandoPargua, esperandoPargua, haciaChacao, haciaChacao);
 }
 
 
 void transbordoAPargua(int v){
-
-
+	logicaTransbordo(v, disponiblesChacao, disponiblesPargua, esperandoPargua, esperandoPargua, haciaChacao, haciaChacao);
 }
 
 
-void logicaTransbordo(int v, int* disponiblesEstaOrilla, int* disponiblesOrillaOpuesta){
-	Vehiculo vehiculo;
-	vehiculo.v = v;
-	vehiculo.listo = FALSE;
 
-	nEnter(m);
-	PutObj(esperandoPargua, *vehiculo);
+// int nMain(int argc, char **argv)
+// {
+// 	inicializar(4);
 
-	while(!vehiculo->listo)
-	{
-		int dispPargua = getDisponible(disponiblesPargua);
-		int dispChacao = getDisponible(disponiblesChacao);
-
-		if (dispPargua > -1)
-		{
-			setDisponible(disponiblesPargua, dispPargua, FALSE);
-			Vehiculo* vehicPargua= GetObj(esperandoPargua);
-			nExit(m);
-			haciaChacao(dispPargua, vehicPargua->v);
-			nEnter(m);
-			setDisponible(disponiblesChacao, dispPargua, TRUE);
-			vehicPargua->listo = TRUE;
-			nNotifyAll(m);
-
-			if (vehicPargua->v == v)
-			{
-				nExit(m);
-				return v;
-			}
-
-			nWait(m);
-		}
-		else if (dispChacao > -1){
-			setDisponible(disponiblesChacao, dispChacao, FALSE);
-			Vehiculo* vehicChacao= GetObj(esperandoChacao);
-			nExit(m);
-
-			if (vehicChacao == NULL){
-				haciaPargua(dispChacao, -1);
-			}
-			else{
-				haciaPargua(dispChacao, vehicChacao->v);
-			}
-			nEnter(m);
-			setDisponible(disponiblesPargua, dispChacao, TRUE);
-
-			if (vehicChacao != NULL){
-				vehicChacao->listo = TRUE;
-			}
-
-			nNotifyAll(m);
-			nWait(m);
-		}
-		else{
-			nWait(m);
-		}
-	}
-
-	nExit(m);
-	return v;
-}
-
-
-int nMain(int argc, char **argv)
-{
-	inicializar(4);
-
-	for (int i = 0; i < transbordadores; ++i)
-	{
-		printf("%d\n", disponiblesPargua[i]);
-		printf("%d\n", disponiblesChacao[i]);
-		printf("\n");
-	}
-}
+// 	for (int i = 0; i < transbordadores; ++i)
+// 	{
+// 		printf("%d\n", disponiblesPargua[i]);
+// 		printf("%d\n", disponiblesChacao[i]);
+// 		printf("\n");
+// 	}
+// }
