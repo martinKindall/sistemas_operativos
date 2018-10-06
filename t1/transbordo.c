@@ -9,7 +9,7 @@ typedef struct{
 	int listo;
 } Vehiculo;
 
-nMonitor ctrl;
+nMonitor mon;
 
 int transbordadores;
 int *disponiblesPargua, *disponiblesChacao;
@@ -20,7 +20,7 @@ FifoQueue esperandoChacao;
 
 void inicializar(int p){
 
-	ctrl= nMakeMonitor();
+	mon= nMakeMonitor();
 
 	transbordadores = p;
 	disponiblesPargua = nMalloc(sizeof(int)*p);
@@ -42,7 +42,7 @@ int getDisponible(int* disponibles)
 
 	for (int i = 0; i < transbordadores; ++i){
 		if (disponibles[i] == 1){
-			disp = disponibles[i];
+			disp = i;
 			break;
 		}
 	}
@@ -62,7 +62,7 @@ void logicaTransbordo(int v, int* disponiblesEstaOrilla, int* disponiblesOrillaO
 	vehiculo.v = v;
 	vehiculo.listo = FALSE;
 
-	nEnter(ctrl);
+	nEnter(mon);
 	PutObj(esperandoAca, &vehiculo);
 
 	while(!vehiculo.listo)
@@ -74,25 +74,25 @@ void logicaTransbordo(int v, int* disponiblesEstaOrilla, int* disponiblesOrillaO
 		{
 			setDisponible(disponiblesEstaOrilla, dispAca, FALSE);
 			Vehiculo* vehicAca= GetObj(esperandoAca);
-			nExit(ctrl);
+			nExit(mon);
 			haciaAlla(dispAca, vehicAca->v);
-			nEnter(ctrl);
+			nEnter(mon);
 			setDisponible(disponiblesOrillaOpuesta, dispAca, TRUE);
 			vehicAca->listo = TRUE;
-			nNotifyAll(ctrl);
+			nNotifyAll(mon);
 
 			if (vehicAca->v == v)
 			{
-				nExit(ctrl);
+				nExit(mon);
 				return;
 			}
 
-			nWait(ctrl);
+			nWait(mon);
 		}
 		else if (dispAlla > -1){
 			setDisponible(disponiblesOrillaOpuesta, dispAlla, FALSE);
 			Vehiculo* vehicAlla= GetObj(esperandoAlla);
-			nExit(ctrl);
+			nExit(mon);
 
 			if (vehicAlla == NULL){
 				haciaAca(dispAlla, -1);
@@ -100,35 +100,35 @@ void logicaTransbordo(int v, int* disponiblesEstaOrilla, int* disponiblesOrillaO
 			else{
 				haciaAca(dispAlla, vehicAlla->v);
 			}
-			nEnter(ctrl);
+			nEnter(mon);
 			setDisponible(disponiblesEstaOrilla, dispAlla, TRUE);
 
 			if (vehicAlla != NULL){
 				vehicAlla->listo = TRUE;
 			}
 
-			nNotifyAll(ctrl);
-			nWait(ctrl);
+			nNotifyAll(mon);
+			nWait(mon);
 		}
 		else{
-			nWait(ctrl);
+			nWait(mon);
 		}
 	}
 
-	nExit(ctrl);
+	nExit(mon);
 	return;
 }
 
 void transbordoAChacao(int v){
-	logicaTransbordo(v, disponiblesPargua, disponiblesChacao, esperandoPargua, esperandoPargua, haciaChacao, haciaChacao);
+	logicaTransbordo(v, disponiblesPargua, disponiblesChacao, esperandoPargua, esperandoChacao, haciaChacao, haciaPargua);
 }
 
 
 void transbordoAPargua(int v){
-	logicaTransbordo(v, disponiblesChacao, disponiblesPargua, esperandoPargua, esperandoPargua, haciaChacao, haciaChacao);
+	logicaTransbordo(v, disponiblesChacao, disponiblesPargua, esperandoChacao, esperandoPargua, haciaPargua, haciaChacao);
 }
 
-
+void finalizar(){}
 
 // int nMain(int argc, char **argv)
 // {
@@ -136,8 +136,8 @@ void transbordoAPargua(int v){
 
 // 	for (int i = 0; i < transbordadores; ++i)
 // 	{
-// 		printf("%d\n", disponiblesPargua[i]);
-// 		printf("%d\n", disponiblesChacao[i]);
-// 		printf("\n");
+// 		nPrintf("%d\n", disponiblesPargua[i]);
+// 		nPrintf("%d\n", disponiblesChacao[i]);
+// 		nPrintf("\n");
 // 	}
 // }

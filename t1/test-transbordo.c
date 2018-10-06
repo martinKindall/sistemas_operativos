@@ -214,14 +214,17 @@ int islenoConMsg(int v) {
 }
 
 void haciaChacao(int i, int v) {
-  if (!verificar)
+  if (!verificar){
     achacao++;
+  }
   else {
     Viaje viaje;
     viaje.i= i;
     viaje.v= v;
     viaje.haciaChacao= TRUE;
+    nPrintf("pasando por aca: %d, %d\n", i, v);
     nSend(ctrl, &viaje);
+    nPrintf("pasando por aca2: %d, %d\n", i, v);
   }
 }
 
