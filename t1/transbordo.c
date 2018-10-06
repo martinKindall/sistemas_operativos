@@ -79,15 +79,16 @@ void logicaTransbordo(int v, int* disponiblesEstaOrilla, int* disponiblesOrillaO
 			nEnter(mon);
 			setDisponible(disponiblesOrillaOpuesta, dispAca, TRUE);
 			vehicAca->listo = TRUE;
-			nNotifyAll(mon);
 
+			nPrintf("paso p: %d, v: %d, sacado: %d\n", dispAca, v, vehicAca->v);
 			if (vehicAca->v == v)
 			{
+				nNotifyAll(mon);
 				nExit(mon);
 				return;
 			}
 
-			nWait(mon);
+			continue;
 		}
 		else if (dispAlla > -1){
 			setDisponible(disponiblesOrillaOpuesta, dispAlla, FALSE);
@@ -102,18 +103,17 @@ void logicaTransbordo(int v, int* disponiblesEstaOrilla, int* disponiblesOrillaO
 			}
 			nEnter(mon);
 			setDisponible(disponiblesEstaOrilla, dispAlla, TRUE);
-
 			if (vehicAlla != NULL){
+				nPrintf("paso p: %d, v: %d, sacado: %d\n", dispAlla, v, vehicAlla->v);
 				vehicAlla->listo = TRUE;
 			}
-
+			nNotifyAll(mon);
 			continue;
 		}
 		else{
 			nWait(mon);
 		}
 	}
-
 	nExit(mon);
 	return;
 }
