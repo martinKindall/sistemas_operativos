@@ -2,18 +2,17 @@
 #include "fifoqueues.h"
 #include <stdio.h>
 #include "transbordo.h"
+#include <string.h>
 
 
 typedef struct{
 	int v;
-	int listo;
-	int enViaje;
-	nCondition cond;
 } Vehiculo;
 
 nMonitor mon;
 
-int esperando;
+nCondition chacao;
+nCondition pargua;
 
 int transbordadores;
 int *disponiblesPargua, *disponiblesChacao;
@@ -38,7 +37,8 @@ void inicializar(int p){
 	esperandoPargua = MakeFifoQueue();
 	esperandoChacao = MakeFifoQueue();
 
-	esperando = 0;
+	chacao = nMakeCondition(mon);
+	pargua = nMakeCondition(mon);
 }
 
 int getDisponible(int* disponibles)
@@ -62,16 +62,32 @@ void setDisponible(int* disponibles, int idx, int val)
 }
 
 
-void logicaTransbordo(int v, int* disponiblesEstaOrilla, int* disponiblesOrillaOpuesta, FifoQueue esperandoAca, FifoQueue esperandoAlla, void (*haciaAlla)(int p1, int v1), void (*haciaAca)(int p2, int v2)){
+void logicaSignal(char* posicion, nCondition cond1, nCondition cond2){
+	if (strcmp(posicion, "pargua") == 0){
+		nSignalCondition(cond1);
+	}else{
+		nSignalCondition(cond2);
+	}
+}
+
+
+void logicaHaciaDisponible(int* disponibles1, int* disponibles2, int disponibilidad, void (*hacia)(int p, int v), int vehiculo){
+	setDisponible(disponibles1, disponibilidad, FALSE);
+	nExit(mon);
+	hacia(disponibilidad, vehiculo);
+	nEnter(mon);
+	setDisponible(disponibles2, disponibilidad, TRUE);
+}
+
+
+void logicaTransbordo(int v, int* disponiblesEstaOrilla, int* disponiblesOrillaOpuesta, FifoQueue esperandoAca, FifoQueue esperandoAlla, void (*haciaAlla)(int p1, int v1), void (*haciaAca)(int p2, int v2), char* posicion){
 	Vehiculo vehiculo;
 	vehiculo.v = v;
-	vehiculo.listo = FALSE;
-	vehiculo.cond = nMakeCondition(mon);
 
 	nEnter(mon);
 	PutObj(esperandoAca, &vehiculo);
 
-	while(!vehiculo.listo)
+	while(TRUE)
 	{
 		int dispAca = getDisponible(disponiblesEstaOrilla);
 		int dispAlla = getDisponible(disponiblesOrillaOpuesta);
@@ -80,59 +96,62 @@ void logicaTransbordo(int v, int* disponiblesEstaOrilla, int* disponiblesOrillaO
 
 		if (dispAca > -1 && vehicAca->v == v)
 		{
-			setDisponible(disponiblesEstaOrilla, dispAca, FALSE);
-			nExit(mon);
-			haciaAlla(dispAca, v);
-			nEnter(mon);
-			setDisponible(disponiblesOrillaOpuesta, dispAca, TRUE);
-			nNotifyAll(mon);
+			logicaHaciaDisponible(disponiblesEstaOrilla, disponiblesOrillaOpuesta, dispAca, haciaAlla, v);
+			logicaSignal(posicion, chacao, pargua);
 			nExit(mon);
 			return;
 		}
 		else if (dispAca > -1 && vehicAca->v != v){
-			nSignalCondition(vehicAca->cond);
+			PushObj(esperandoAca, vehicAca);
+			logicaSignal(posicion, pargua, chacao);
 		}
-		
-		if (dispAlla > -1){
+		else if (dispAlla > -1){
 			Vehiculo* vehicAlla= GetObj(esperandoAlla);
 
 			if (vehicAlla != NULL){
-				nSignalCondition(vehicAlla->cond);
 				PushObj(esperandoAlla, vehicAlla);
+				PushObj(esperandoAca, vehicAca);
+				logicaSignal(posicion, chacao, pargua);
 			}else{
-				setDisponible(disponiblesOrillaOpuesta, dispAlla, FALSE);
-				nExit(mon);
-				haciaAca(dispAlla, -1);
-				nEnter(mon);
-				setDisponible(disponiblesEstaOrilla, dispAlla, TRUE);
+				logicaHaciaDisponible(disponiblesOrillaOpuesta, disponiblesEstaOrilla, dispAlla, haciaAca, -1);
 				if (vehicAca->v == v){
-					PushObj(esperandoAca, vehicAca);
-					continue;
+					logicaHaciaDisponible(disponiblesEstaOrilla, disponiblesOrillaOpuesta, dispAlla, haciaAlla, v);
+					logicaSignal(posicion, chacao, pargua);
+					nExit(mon);
+					return;
 				}else{
-					nSignalCondition(vehicAca->cond);
 					PushObj(esperandoAca, vehicAca);
+					logicaSignal(posicion, pargua, chacao);
 				}
 			}
+		}else{
+			PushObj(esperandoAca, vehicAca);
 		}
 
-		nWaitCondition(vehiculo.cond);
+		if (strcmp(posicion, "pargua") == 0){
+			nWaitCondition(pargua);
+		}
+		else{
+			nWaitCondition(chacao);
+		}
 	}
-
-	nExit(mon);
-	return;
 }
 
 
 void transbordoAChacao(int v){
-	logicaTransbordo(v, disponiblesPargua, disponiblesChacao, esperandoPargua, esperandoChacao, haciaChacao, haciaPargua);
+	logicaTransbordo(v, disponiblesPargua, disponiblesChacao, esperandoPargua, esperandoChacao, haciaChacao, haciaPargua, "pargua");
 }
 
 
 void transbordoAPargua(int v){
-	logicaTransbordo(v, disponiblesChacao, disponiblesPargua, esperandoChacao, esperandoPargua, haciaPargua, haciaChacao);
+	logicaTransbordo(v, disponiblesChacao, disponiblesPargua, esperandoChacao, esperandoPargua, haciaPargua, haciaChacao, "chacao");
 }
+
 
 void finalizar(){
 	nFree(disponiblesPargua);
 	nFree(disponiblesChacao);
+
+	nDestroyCondition(pargua);
+	nDestroyCondition(chacao);
 }

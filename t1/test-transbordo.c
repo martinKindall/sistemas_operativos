@@ -214,9 +214,8 @@ int islenoConMsg(int v) {
 }
 
 void haciaChacao(int i, int v) {
-  if (!verificar){
+  if (!verificar)
     achacao++;
-  }
   else {
     Viaje viaje;
     viaje.i= i;
