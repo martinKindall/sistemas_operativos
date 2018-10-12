@@ -154,4 +154,9 @@ void finalizar(){
 
 	nDestroyCondition(pargua);
 	nDestroyCondition(chacao);
+
+	DestroyFifoQueue(esperandoPargua);
+	DestroyFifoQueue(esperandoChacao);
+
+	nDestroyMonitor(mon);
 }
