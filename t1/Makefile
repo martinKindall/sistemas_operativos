@@ -15,7 +15,7 @@ LIBNSYS= $(NSYSTEM)/lib/libnSys.a
 CFLAGS= -ggdb -pedantic -Wall -std=c99 -I$(NSYSTEM)/include -I$(NSYSTEM)/src
 LFLAGS= -ggdb
 
-all: test-transbordo
+all: test-transbordo test-transbordo2
 
 .SUFFIXES:
 .SUFFIXES: .o .c .s
