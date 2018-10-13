@@ -29,17 +29,29 @@ int isleno(int v), islenoConMsg(int v);
 int automovilista(int v, int n);
 
 int nMain( int argc, char **argv ) {
-  inicializar(3);
+  ctrl= nCurrentTask();
+  inicializar(2);
+  verificar= TRUE;
+
   nPrintf("\n\nTest X: se transborda 1 vehiculo a chacao y 1 vehiculo a pargua en paralelo. Los transbordadores osciosos se deben quedar quietos.\n");
 
   nTask t0= nEmitTask(norteno, 0);
-  nTask t1= nEmitTask(isleno, 1);
+  Viaje *viajea= esperarTransbordo();
+  nPrintf("\ndatos del viajeA. trans: %d, auto: %d, haciaChacao: %d\n", viajea->i, viajea->v, viajea->haciaChacao);
+  nTask t1= nEmitTask(norteno, 1);
+  Viaje *viajeb= esperarTransbordo();
+  nPrintf("\ndatos del viajeB. trans: %d, auto: %d, haciaChacao: %d\n", viajeb->i, viajeb->v, viajeb->haciaChacao);
 
-  
+  nPrintf("paso2:");
+
+  if (viajea->i==viajeb->i)
+      nFatalError("nMain", "Los transbordadores debieron ser distintos\n");
+  continuarTransbordo(viajeb);
+  continuarTransbordo(viajea);
+
 
   nWaitTask(t0); 
-  nWaitTask(t1);
-
+  nWaitTask(t1); 
   finalizar();
 
   nPrintf("\n\nCustom Test aprobado\n");
