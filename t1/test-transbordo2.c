@@ -30,28 +30,41 @@ int automovilista(int v, int n);
 
 int nMain( int argc, char **argv ) {
   ctrl= nCurrentTask();
-  inicializar(2);
+  inicializar(1);
   verificar= TRUE;
 
   nPrintf("\n\nTest X: se transborda 1 vehiculo a chacao y 1 vehiculo a pargua en paralelo. Los transbordadores osciosos se deben quedar quietos.\n");
 
   nTask t0= nEmitTask(norteno, 0);
+  nTask t1= nEmitTask(isleno, 1);
   Viaje *viajea= esperarTransbordo();
+  // Viaje *viajeb= esperarTransbordo();
+  // Viaje *viajeb= esperarTransbordo();
   nPrintf("\ndatos del viajeA. trans: %d, auto: %d, haciaChacao: %d\n", viajea->i, viajea->v, viajea->haciaChacao);
-  nTask t1= nEmitTask(norteno, 1);
-  Viaje *viajeb= esperarTransbordo();
-  nPrintf("\ndatos del viajeB. trans: %d, auto: %d, haciaChacao: %d\n", viajeb->i, viajeb->v, viajeb->haciaChacao);
-
-  nPrintf("paso2:");
-
-  if (viajea->i==viajeb->i)
-      nFatalError("nMain", "Los transbordadores debieron ser distintos\n");
-  continuarTransbordo(viajeb);
+  // nPrintf("\ndatos del viajeB. trans: %d, auto: %d, haciaChacao: %d\n", viajeb->i, viajeb->v, viajeb->haciaChacao);
   continuarTransbordo(viajea);
+  viajea= esperarTransbordo();
+  nPrintf("\ndatos del viajeA. trans: %d, auto: %d, haciaChacao: %d\n", viajea->i, viajea->v, viajea->haciaChacao);
+  continuarTransbordo(viajea);
+  // if (viajea->v==-1){
+  //   nPrintf("entro if\n");
+  //   // continuarTransbordo(viajeb);
+  //   viajea= esperarTransbordo();
+  // }
+  // else
+    // nFatalError("nMain", "Tenía que venir un transbordador vacío\n");
+
+  // continuarTransbordo(viajeb);
+  // nTask t2= nEmitTask(isleno, 2);
+
+  // if (viajea->i==viajeb->i)
+  //     nFatalError("nMain", "Los transbordadores debieron ser distintos\n");
+  
 
 
   nWaitTask(t0); 
   nWaitTask(t1); 
+  // nWaitTask(t2); 
   finalizar();
 
   nPrintf("\n\nCustom Test aprobado\n");
