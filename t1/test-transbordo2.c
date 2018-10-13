@@ -30,34 +30,34 @@ int automovilista(int v, int n);
 
 int nMain( int argc, char **argv ) {
   ctrl= nCurrentTask();
-  inicializar(2);
+  inicializar(3);
   verificar= TRUE;
 
   nPrintf("\n\nTest X: se transborda 1 vehiculo a chacao y 1 vehiculo a pargua en paralelo. Los transbordadores osciosos se deben quedar quietos.\n");
 
   nTask t0= nEmitTask(norteno, 0);
   nTask t1= nEmitTask(isleno, 1);
-  nTask t2= nEmitTask(isleno, 2);
   Viaje *viajea= esperarTransbordo();
   Viaje *viajeb= esperarTransbordo();
   nPrintf("\ndatos del viajeA. trans: %d, auto: %d, haciaChacao: %d\n", viajea->i, viajea->v, viajea->haciaChacao);
   nPrintf("\ndatos del viajeB. trans: %d, auto: %d, haciaChacao: %d\n", viajeb->i, viajeb->v, viajeb->haciaChacao);
-  continuarTransbordo(viajea);
-  viajea= esperarTransbordo();
-  nPrintf("\ndatos del viajeA. trans: %d, auto: %d, haciaChacao: %d\n", viajea->i, viajea->v, viajea->haciaChacao);
-  continuarTransbordo(viajea);
-  
   continuarTransbordo(viajeb);
+  // viajea= esperarTransbordo();
+  // nPrintf("\ndatos del viajeA. trans: %d, auto: %d, haciaChacao: %d\n", viajea->i, viajea->v, viajea->haciaChacao);
+  
+  // continuarTransbordo(viajeb);
   nPrintf("\ndatos del viajeB. trans: %d, auto: %d, haciaChacao: %d\n", viajeb->i, viajeb->v, viajeb->haciaChacao);
-  viajeb= esperarTransbordo();
-  if (viajeb->v==-1){
-    nPrintf("entro if\n");
-    // continuarTransbordo(viajeb);
-    viajeb= esperarTransbordo();
-  }
+  // viajeb= esperarTransbordo();
+  // if (viajeb->v==-1){
+  //   nPrintf("entro if\n");
+  //   // continuarTransbordo(viajeb);
+  //   viajeb= esperarTransbordo();
+  // }
   // else
   //   nFatalError("nMain", "Tenía que venir un transbordador vacío\n");
-
+  // continuarTransbordo(viajeb);
+  viajeb= esperarTransbordo();
+  continuarTransbordo(viajea);
   continuarTransbordo(viajeb);
   // nTask t2= nEmitTask(isleno, 2);
 
@@ -68,7 +68,6 @@ int nMain( int argc, char **argv ) {
 
   nWaitTask(t0); 
   nWaitTask(t1); 
-  nWaitTask(t2); 
   finalizar();
 
   nPrintf("\n\nCustom Test aprobado\n");
