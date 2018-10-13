@@ -57,8 +57,15 @@ int nMain( int argc, char **argv ) {
   //   nFatalError("nMain", "Tenía que venir un transbordador vacío\n");
   // continuarTransbordo(viajeb);
   viajeb= esperarTransbordo();
-  continuarTransbordo(viajea);
+  nTask t2= nEmitTask(isleno, 2);
+  Viaje *viajec= esperarTransbordo();
+  nPrintf("\ndatos del viajeC. trans: %d, auto: %d, haciaChacao: %d\n", viajec->i, viajec->v, viajec->haciaChacao);
   continuarTransbordo(viajeb);
+  continuarTransbordo(viajea);
+  continuarTransbordo(viajec);
+  viajec= esperarTransbordo();
+  nPrintf("\ndatos del viajeC. trans: %d, auto: %d, haciaChacao: %d\n", viajec->i, viajec->v, viajec->haciaChacao);
+  continuarTransbordo(viajec);
   // nTask t2= nEmitTask(isleno, 2);
 
   // if (viajea->i==viajeb->i)
