@@ -33,6 +33,7 @@ __attribute__((section("__versions"))) = {
 	{ 0x5ce3582e, __VMLINUX_SYMBOL_STR(kmem_cache_alloc_trace) },
 	{ 0x37a0cba, __VMLINUX_SYMBOL_STR(kfree) },
 	{ 0x78e739aa, __VMLINUX_SYMBOL_STR(up) },
+	{ 0x4f6b400b, __VMLINUX_SYMBOL_STR(_copy_from_user) },
 };
 
 static const char __module_depends[]
@@ -41,4 +42,4 @@ __attribute__((section(".modinfo"))) =
 "depends=";
 
 
-MODULE_INFO(srcversion, "9FDF6D54F397226D0CBE758");
+MODULE_INFO(srcversion, "A31CEEA4E0BDE0CF29DF584");

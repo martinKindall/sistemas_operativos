@@ -79,7 +79,8 @@ int syncwrite_init(void) {
   readers= 0;
   writing= FALSE;
   pend_open_write= 0;
-  curr_size= 0;
+  curr_size_0= 0;
+  curr_size_1= 0;
   m_init(&mutex);
   c_init(&cond);
 
@@ -91,7 +92,7 @@ int syncwrite_init(void) {
     syncwrite_exit();
     return -ENOMEM;
   }
-  
+
   memset(syncwrite_buffer_0, 0, MAX_SIZE);
   memset(syncwrite_buffer_1, 0, MAX_SIZE);
 
@@ -118,13 +119,12 @@ void syncwrite_exit(void) {
 
 
 int syncwrite_open(struct inode *inode, struct file *filp) {
-	// int rc= 0;
+	int rc= 0;
+
 	m_lock(&mutex);
 
   	if (filp->f_mode & FMODE_WRITE) {
   		
-  		printk("El minor es %d\n", minor);
-
   		/* Se debe esperar hasta que no hayan otros lectores o escritores */
 	    pend_open_write++;
 	    while (writing || readers>0) {
@@ -137,7 +137,7 @@ int syncwrite_open(struct inode *inode, struct file *filp) {
 	    }
 	    writing= TRUE;
 	    pend_open_write--;
-	    curr_size= 0;
+
 	    c_broadcast(&cond);
 	    printk("<1>open for write successful\n");
   	}
@@ -147,13 +147,13 @@ int syncwrite_open(struct inode *inode, struct file *filp) {
 	   	* nuevos lectores deben esperar hasta que todos los lectores cierren
 	   	* el dispositivo e ingrese un nuevo escritor.
 	   	*/
-	  // 	while (!writing && pend_open_write>0) {
-	  //   	if (c_wait(&cond, &mutex)) {
-	  //     	rc= -EINTR;
-	  //     	goto epilog;
-	  //   	}
-	  // 	}
-	 	// readers++;
+	  	while (!writing && pend_open_write>0) {
+	    	if (c_wait(&cond, &mutex)) {
+	      	rc= -EINTR;
+	      	goto epilog;
+	    	}
+	  	}
+	 	readers++;
 		printk("<1>open for read\n");
 	}
 
@@ -165,6 +165,21 @@ int syncwrite_open(struct inode *inode, struct file *filp) {
 
 int syncwrite_release(struct inode *inode, struct file *filp) {
 	printk("<1>release %p\n", filp);
+	m_lock(&mutex);
+
+	if (filp->f_mode & FMODE_WRITE) {
+		writing= FALSE;
+		c_broadcast(&cond);
+		printk("<1>close for write successful\n");
+	}
+	else if (filp->f_mode & FMODE_READ) {
+		readers--;
+		if (readers==0)
+	  	c_broadcast(&cond);
+		printk("<1>close for read (readers remaining=%d)\n", readers);
+	}
+
+	m_unlock(&mutex);
 	return 0;
 }
 
@@ -189,22 +204,37 @@ ssize_t syncwrite_write( struct file *filp, const char *buf,
 	if (last>MAX_SIZE) {
 		count -= last-MAX_SIZE;
 	}
-	printk("<1>write %d bytes at %d\n", (int)count, (int)*f_pos);
+	printk("<1>write %d bytes at %d device minor %d\n", (int)count, (int)*f_pos, minor);
 
 	if (minor == 1){
+		/* Transfiriendo datos desde el espacio del usuario */
+		if (copy_from_user(syncwrite_buffer_1+*f_pos, buf, count)!=0) {
+			/* el valor de buf es una direccion invalida */
+			rc= -EFAULT;
+			goto epilog;
+		}
 
+		*f_pos += count;
+		curr_size_1 = *f_pos;
+		rc= count;
 	}
+	else if (minor == 0){
+		/* Transfiriendo datos desde el espacio del usuario */
+		if (copy_from_user(syncwrite_buffer_0+*f_pos, buf, count)!=0) {
+			/* el valor de buf es una direccion invalida */
+			rc= -EFAULT;
+			goto epilog;
+		}
 
-	/* Transfiriendo datos desde el espacio del usuario */
-	if (copy_from_user(syncread_buffer+*f_pos, buf, count)!=0) {
-		/* el valor de buf es una direccion invalida */
+		*f_pos += count;
+		curr_size_0 = *f_pos;
+		rc= count;
+	}
+	else{
 		rc= -EFAULT;
 		goto epilog;
 	}
 
-	*f_pos += count;
-	curr_size= *f_pos;
-	rc= count;
 	c_broadcast(&cond);
 
 	epilog:
