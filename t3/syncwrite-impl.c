@@ -167,7 +167,7 @@ int syncwrite_release(struct inode *inode, struct file *filp) {
 
 ssize_t syncwrite_read(struct file *filp, char *buf,
                     size_t count, loff_t *f_pos) {
-	return count;
+	return 0;
 }
 
 
