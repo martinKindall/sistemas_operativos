@@ -231,9 +231,10 @@ ssize_t syncwrite_read(struct file *filp, char *buf,
 		}
 	}
 
+	printk("entrando...\n");
 
 	if (curr_size_1 > 0 && !readBuffer1){
-		printk("buffer 1 leyendose...");
+		printk("buffer 1 leyendose...\n");
 		if (count > curr_size_1-*f_pos) {
 			count = curr_size_1-*f_pos;
 			readBuffer1 = TRUE;
@@ -251,19 +252,22 @@ ssize_t syncwrite_read(struct file *filp, char *buf,
 		*f_pos+= count;
 		rc= count;
 
+		if (readBuffer1){
+			count = original_count;
+			*f_pos = 0;
+		}
+		
+		printk("entro 2\n");
 		if (rc != 0){
 			m_unlock(&mutex);
 			return rc;
 		}
-
-		if (readBuffer1){
-			count = original_count;
-		}
 	}
 
-	if (!readBuffer1 && curr_size_0 > 0){
-		if (count > curr_size_1 + curr_size_0-*f_pos) {
-			count = curr_size_1 + curr_size_0-*f_pos;
+	if (curr_size_0 > 0){
+		printk("buffer 0 leyendose...\n");
+		if (count > curr_size_0-*f_pos) {
+			count = curr_size_0-*f_pos;
 		}
 
 		printk("<1>read %d bytes at %d device minor 0\n", (int)count, (int)*f_pos);
