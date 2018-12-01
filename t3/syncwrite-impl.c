@@ -59,10 +59,12 @@ static ssize_t curr_size_1;
 static int readers;
 static int writing;
 static int pend_open_write;
+static int readContent;
 
 /* El mutex y la condicion para syncwrite */
 static KMutex mutex;
 static KCondition cond;
+static KCondition cond_readContent;
 
 
 int syncwrite_init(void) {
@@ -76,6 +78,7 @@ int syncwrite_init(void) {
     return rc;
   }
 
+  readContent = FALSE;
   readers= 0;
   writing= FALSE;
   pend_open_write= 0;
@@ -83,6 +86,7 @@ int syncwrite_init(void) {
   curr_size_1= 0;
   m_init(&mutex);
   c_init(&cond);
+  c_init(&cond_readContent);
 
   /* Allocating syncwrite_buffer */
   syncwrite_buffer_0 = kmalloc(MAX_SIZE, GFP_KERNEL);
@@ -164,29 +168,115 @@ int syncwrite_open(struct inode *inode, struct file *filp) {
 
 
 int syncwrite_release(struct inode *inode, struct file *filp) {
+	int rc;
+
 	printk("<1>release %p\n", filp);
 	m_lock(&mutex);
 
 	if (filp->f_mode & FMODE_WRITE) {
 		writing= FALSE;
+		readContent = FALSE;
+		
 		c_broadcast(&cond);
+
+		while (!readContent) {
+	      if (c_wait(&cond_readContent, &mutex)) {
+	        printk("<1>write interrupted\n");
+	        goto epilog;
+	      }
+	    }
+
 		printk("<1>close for write successful\n");
 	}
 	else if (filp->f_mode & FMODE_READ) {
 		readers--;
-		if (readers==0)
-	  	c_broadcast(&cond);
+		if (readers==0){
+		  	readContent = TRUE;
+			curr_size_0 = 0;
+			curr_size_1 = 0;
+		  	c_broadcast(&cond);
+		  	c_broadcast(&cond_readContent);
+		}
 		printk("<1>close for read (readers remaining=%d)\n", readers);
 	}
 
-	m_unlock(&mutex);
-	return 0;
+	rc = 0;
+
+	epilog:
+		m_unlock(&mutex);
+		return rc;
 }
 
 
 ssize_t syncwrite_read(struct file *filp, char *buf,
                     size_t count, loff_t *f_pos) {
-	return 0;
+	
+	int buffer_full = FALSE;
+	ssize_t rc;
+	size_t readBytes;
+
+	m_lock(&mutex);
+
+	while (writing) {
+		/* si el lector esta en el final del archivo pero hay un proceso
+		 * escribiendo todavia en el archivo, el lector espera.
+		 */
+		if (c_wait(&cond, &mutex)) {
+		printk("<1>read interrupted\n");
+		rc= -EINTR;
+	  	goto epilog;
+		}
+	}
+
+
+	if (curr_size_1 > 0){
+		if (count > curr_size_1-*f_pos) {
+			count -= curr_size_1-*f_pos;
+			readBytes = curr_size_1-*f_pos;
+		}
+		else{
+			readBytes = count;
+			buffer_full = TRUE;
+		}
+
+		printk("<1>read %d bytes at %d device minor 1\n", (int)readBytes, (int)*f_pos);
+
+		/* Transfiriendo datos hacia el espacio del usuario */
+		if (copy_to_user(buf, syncwrite_buffer_1+*f_pos, count)!=0) {
+			/* el valor de buf es una direccion invalida */
+			rc= -EFAULT;
+			goto epilog;
+		}
+
+		*f_pos+= count;
+		rc= count;
+	}
+
+	if (!buffer_full && curr_size_0 > 0){
+		if (count > curr_size_0-*f_pos) {
+			count = curr_size_0-*f_pos;
+			readBytes = curr_size_0-*f_pos;
+		}
+		else{
+			readBytes = count;
+		}
+
+		printk("<1>read %d bytes at %d device minor 0\n", (int)readBytes, (int)*f_pos);
+
+		/* Transfiriendo datos hacia el espacio del usuario */
+		if (copy_to_user(buf, syncwrite_buffer_0+*f_pos, count)!=0) {
+			/* el valor de buf es una direccion invalida */
+			rc= -EFAULT;
+			goto epilog;
+		}
+
+		*f_pos+= count;
+		rc += count;
+	}
+
+	epilog:
+		m_unlock(&mutex);
+		return rc;
 }
 
 
