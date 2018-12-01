@@ -60,6 +60,7 @@ static int readers;
 static int writing;
 static int pend_open_write;
 static int readContent;
+static int readBuffer1;
 
 /* El mutex y la condicion para syncwrite */
 static KMutex mutex;
@@ -78,6 +79,7 @@ int syncwrite_init(void) {
     return rc;
   }
 
+  readBuffer1 = FALSE;
   readContent = FALSE;
   readers= 0;
   writing= FALSE;
@@ -176,7 +178,7 @@ int syncwrite_release(struct inode *inode, struct file *filp) {
 	if (filp->f_mode & FMODE_WRITE) {
 		writing= FALSE;
 		readContent = FALSE;
-		
+
 		c_broadcast(&cond);
 
 		while (!readContent) {
@@ -211,7 +213,6 @@ int syncwrite_release(struct inode *inode, struct file *filp) {
 ssize_t syncwrite_read(struct file *filp, char *buf,
                     size_t count, loff_t *f_pos) {
 	
-	int buffer_full = FALSE;
 	ssize_t rc;
 	size_t readBytes;
 
@@ -229,17 +230,13 @@ ssize_t syncwrite_read(struct file *filp, char *buf,
 	}
 
 
-	if (curr_size_1 > 0){
+	if (curr_size_1 > 0 && !readBuffer1){
 		if (count > curr_size_1-*f_pos) {
-			count -= curr_size_1-*f_pos;
-			readBytes = curr_size_1-*f_pos;
-		}
-		else{
-			readBytes = count;
-			buffer_full = TRUE;
+			count = curr_size_1-*f_pos;
+			readBuffer1 = TRUE;
 		}
 
-		printk("<1>read %d bytes at %d device minor 1\n", (int)readBytes, (int)*f_pos);
+		printk("<1>read %d bytes at %d device minor 1\n", (int)count, (int)*f_pos);
 
 		/* Transfiriendo datos hacia el espacio del usuario */
 		if (copy_to_user(buf, syncwrite_buffer_1+*f_pos, count)!=0) {
@@ -250,9 +247,14 @@ ssize_t syncwrite_read(struct file *filp, char *buf,
 
 		*f_pos+= count;
 		rc= count;
+
+		if (rc != 0){
+			m_unlock(&mutex);
+			return rc;
+		}
 	}
 
-	if (!buffer_full && curr_size_0 > 0){
+	if (!readBuffer1 && curr_size_0 > 0){
 		if (count > curr_size_0-*f_pos) {
 			count = curr_size_0-*f_pos;
 			readBytes = curr_size_0-*f_pos;
@@ -271,7 +273,7 @@ ssize_t syncwrite_read(struct file *filp, char *buf,
 		}
 
 		*f_pos+= count;
-		rc += count;
+		rc = count;
 	}
 
 	epilog:
