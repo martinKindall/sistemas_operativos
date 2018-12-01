@@ -184,6 +184,7 @@ int syncwrite_release(struct inode *inode, struct file *filp) {
 		while (!readContent) {
 	      if (c_wait(&cond_readContent, &mutex)) {
 	        printk("<1>write interrupted\n");
+	        rc = -EINTR;
 	        goto epilog;
 	      }
 	    }
@@ -192,6 +193,8 @@ int syncwrite_release(struct inode *inode, struct file *filp) {
 	}
 	else if (filp->f_mode & FMODE_READ) {
 		readers--;
+		readBuffer1 = FALSE;
+		
 		if (readers==0){
 		  	readContent = TRUE;
 			curr_size_0 = 0;
@@ -213,9 +216,8 @@ int syncwrite_release(struct inode *inode, struct file *filp) {
 ssize_t syncwrite_read(struct file *filp, char *buf,
                     size_t count, loff_t *f_pos) {
 	
-	ssize_t rc;
-	size_t readBytes;
-
+	size_t original_count = count;
+	ssize_t rc = 0;
 	m_lock(&mutex);
 
 	while (writing) {
@@ -231,6 +233,7 @@ ssize_t syncwrite_read(struct file *filp, char *buf,
 
 
 	if (curr_size_1 > 0 && !readBuffer1){
+		printk("buffer 1 leyendose...");
 		if (count > curr_size_1-*f_pos) {
 			count = curr_size_1-*f_pos;
 			readBuffer1 = TRUE;
@@ -252,18 +255,18 @@ ssize_t syncwrite_read(struct file *filp, char *buf,
 			m_unlock(&mutex);
 			return rc;
 		}
+
+		if (readBuffer1){
+			count = original_count;
+		}
 	}
 
 	if (!readBuffer1 && curr_size_0 > 0){
-		if (count > curr_size_0-*f_pos) {
-			count = curr_size_0-*f_pos;
-			readBytes = curr_size_0-*f_pos;
-		}
-		else{
-			readBytes = count;
+		if (count > curr_size_1 + curr_size_0-*f_pos) {
+			count = curr_size_1 + curr_size_0-*f_pos;
 		}
 
-		printk("<1>read %d bytes at %d device minor 0\n", (int)readBytes, (int)*f_pos);
+		printk("<1>read %d bytes at %d device minor 0\n", (int)count, (int)*f_pos);
 
 		/* Transfiriendo datos hacia el espacio del usuario */
 		if (copy_to_user(buf, syncwrite_buffer_0+*f_pos, count)!=0) {
