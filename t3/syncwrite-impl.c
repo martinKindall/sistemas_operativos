@@ -194,7 +194,7 @@ int syncwrite_release(struct inode *inode, struct file *filp) {
 	else if (filp->f_mode & FMODE_READ) {
 		readers--;
 		readBuffer1 = FALSE;
-		
+
 		if (readers==0){
 		  	readContent = TRUE;
 			curr_size_0 = 0;
@@ -303,26 +303,26 @@ ssize_t syncwrite_write( struct file *filp, const char *buf,
 
 	if (minor == 1){
 		/* Transfiriendo datos desde el espacio del usuario */
-		if (copy_from_user(syncwrite_buffer_1+*f_pos, buf, count)!=0) {
+		if (copy_from_user(syncwrite_buffer_1+*f_pos+curr_size_1, buf, count)!=0) {
 			/* el valor de buf es una direccion invalida */
 			rc= -EFAULT;
 			goto epilog;
 		}
 
 		*f_pos += count;
-		curr_size_1 = *f_pos;
+		curr_size_1 += count;
 		rc= count;
 	}
 	else if (minor == 0){
 		/* Transfiriendo datos desde el espacio del usuario */
-		if (copy_from_user(syncwrite_buffer_0+*f_pos, buf, count)!=0) {
+		if (copy_from_user(syncwrite_buffer_0+*f_pos+curr_size_0, buf, count)!=0) {
 			/* el valor de buf es una direccion invalida */
 			rc= -EFAULT;
 			goto epilog;
 		}
 
 		*f_pos += count;
-		curr_size_0 = *f_pos;
+		curr_size_0 += count;
 		rc= count;
 	}
 	else{
